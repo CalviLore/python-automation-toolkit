@@ -71,11 +71,3 @@ Per ottenere una API key gratuita: https://platform.deepseek.com
 La cartella contiene anche `test_translation_pipeline.py`, un prototipo
 che dimostra la traduzione con modelli **HuggingFace locali** (senza API esterne),
 usato come base di studio prima di integrare DeepSeek.
-```
-docs(ai): add README explaining AI translation scripts and workflow
-
-- Documents recommended execution order for full catalog translation
-- Lists input/output files and key differences for each script
-- Explains LINGUA_TARGET and API key configuration
-- Adds installation instructions for required dependencies
-- Notes prototype script for local HuggingFace pipeline
