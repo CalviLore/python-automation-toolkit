@@ -72,11 +72,6 @@ La cartella contiene anche `test_translation_pipeline.py`, un prototipo
 che dimostra la traduzione con modelli **HuggingFace locali** (senza API esterne),
 usato come base di studio prima di integrare DeepSeek.
 ```
-
----
-
-**Commit message:**
-```
 docs(ai): add README explaining AI translation scripts and workflow
 
 - Documents recommended execution order for full catalog translation
