@@ -1,0 +1,47 @@
+# 📦 02_order_management — Gestione Ordini
+
+Questa cartella contiene gli script per scaricare, trasformare e formattare
+gli ordini PrestaShop per l'importazione nel gestionale aziendale.
+
+---
+
+## 📋 Flusso consigliato
+
+```
+1. download_ordini.py   →  Scarica gli ordini dal DB → header.csv + rows.csv
+2. ordiniKit.py         →  Espande i prodotti KIT in righe singole → rows_new.csv
+3. cassa.py             →  Genera il file per il gestionale di cassa → demofile_cassa.txt
+```
+
+---
+
+## 📁 Script
+
+| Script | Input | Output | Descrizione |
+|---|---|---|---|
+| `download_ordini.py` | Database PrestaShop | `header.csv` + `rows.csv` | Scarica ordini per intervallo di giorni scelto dall'utente |
+| `ordiniKit.py` | `rows.csv` + `kitScuola.csv` | `rows_new.csv` | Espande i KIT nei componenti singoli con nome e prezzo |
+| `cassa.py` | Database PrestaShop | `demofile_cassa.txt` | Genera file a larghezza fissa per importazione nel gestionale |
+
+---
+
+## ⚙️ Configurazione
+
+Ogni script richiede le credenziali del database PrestaShop:
+
+```python
+db_config = {
+    'host':     'IL_TUO_HOST',
+    'user':     'IL_TUO_UTENTE',
+    'password': 'LA_TUA_PASSWORD',
+    'database': 'IL_TUO_DATABASE'
+}
+```
+
+---
+
+## 📦 Dipendenze
+
+```bash
+pip install mysql-connector-python
+```
