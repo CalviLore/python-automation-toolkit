@@ -78,4 +78,3 @@ GHI789
 ```bash
 pip install mysql-connector-python pymysql
 ```
-```
