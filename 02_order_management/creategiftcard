@@ -1,0 +1,68 @@
+#  Questo script legge un file CSV contenente codici e importi di buoni sconto
+# (gift card) e li carica automaticamente sul negozio online PrestaShop.
+# Per ogni riga del CSV viene creato un buono sconto valido 2 anni dalla
+# data di esecuzione dello script.
+#
+# 📁 Cartella: csv_excel/
+# 📦 Dipendenze: prestapyt, csv, datetime
+# ==============================================================================
+
+from datetime import datetime, timedelta
+from prestapyt import PrestaShopWebServiceDict
+import csv
+
+# ------------------------------------------------------------------------------
+# CONFIGURAZIONE CONNESSIONE PRESTASHOP
+# Inserire qui le proprie credenziali del negozio PrestaShop.
+# ⚠️ Non condividere mai l'API key pubblicamente!
+# ------------------------------------------------------------------------------
+API_KEY = "LA_TUA_API_KEY"           # Sostituisci con la tua API key
+SHOP_URL = "http://www.tuosito.com/api"  # Sostituisci con l'URL del tuo negozio
+
+# Inizializza la connessione alle API di PrestaShop
+prestashop = PrestaShopWebServiceDict(SHOP_URL, API_KEY)
+
+# ------------------------------------------------------------------------------
+# LETTURA DEL FILE CSV
+# Il file "giftcard.csv" deve avere il separatore ";" e contenere:
+#   - Colonna 0: codice del buono sconto
+#   - Colonna 1: importo del buono sconto
+# ------------------------------------------------------------------------------
+with open('giftcard.csv', 'r', newline='', encoding='utf-8') as csvfile:
+    reader = csv.reader(csvfile, delimiter=';')
+    next(reader)  # Salta la prima riga (intestazione delle colonne)
+
+    # Calcola la data di oggi e la data di scadenza (2 anni da oggi)
+    data_oggi = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
+    data_scadenza = (datetime.today() + timedelta(days=730)).strftime('%Y-%m-%d %H:%M:%S')
+
+    # ------------------------------------------------------------------------------
+    # CREAZIONE DEI BUONI SCONTO
+    # Per ogni riga del CSV viene creato un buono sconto su PrestaShop
+    # ------------------------------------------------------------------------------
+    for row in reader:
+        # Costruisce il payload XML con i dati del buono sconto
+        xml = f"""
+        <prestashop xmlns:ns0="http://www.w3.org/1999/xlink">
+          <cart_rule>
+            <date_from>{data_oggi}</date_from>         <!-- Data inizio validità (oggi) -->
+            <date_to>{data_scadenza}</date_to>         <!-- Data fine validità (+ 2 anni) -->
+            <quantity>1</quantity>                     <!-- Utilizzi totali consentiti -->
+            <quantity_per_user>1</quantity_per_user>   <!-- Utilizzi per utente -->
+            <code>{row[0]}</code>                      <!-- Codice buono dal CSV -->
+            <minimum_amount>{row[1]}</minimum_amount>  <!-- Importo minimo ordine -->
+            <minimum_amount_tax>1</minimum_amount_tax> <!-- Importo minimo con tasse -->
+            <reduction_amount>{row[1]}</reduction_amount> <!-- Valore sconto -->
+            <reduction_tax>1</reduction_tax>           <!-- Sconto applicato con tasse -->
+            <active>1</active>                         <!-- Buono attivo -->
+            <name>
+              <language id="1">GIFT CARD WEB</language> <!-- Nome visibile al cliente -->
+            </name>
+          </cart_rule>
+        </prestashop>
+        """
+
+        # Invia il buono sconto a PrestaShop tramite API
+        prestashop.add('cart_rules', xml)
+        print(f"✅ Buono sconto creato: {row[0]} - Importo: {row[1]}€")
+
