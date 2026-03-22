@@ -59,10 +59,3 @@ GIFT002;100
 ```bash
 pip install mysql-connector-python prestapyt
 ```
-```
-
----
-
-**Commit message:**
-```
-docs(order_management): update README with download_ordini and Buonisconto scripts
