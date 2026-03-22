@@ -74,8 +74,6 @@ DEF456
 GHI789
 ```
 
----
-
 ## 📦 Dipendenze
 ```bash
 pip install mysql-connector-python pymysql
