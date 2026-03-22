@@ -84,18 +84,6 @@ pip install mysql-connector-python pymysql
 
 ---
 
-**Commit message:**
-```
-docs(database_sql): add README for SQL update scripts (price and position)# 🛒 03_prestashop_api — Operazioni su PrestaShop
-
-Questa cartella contiene gli script per aggiornare direttamente il database
-PrestaShop: prezzi, posizioni, stato prodotti, giacenze e buoni sconto.
-
-Tutti gli script supportano la modalità **DRY_RUN** (simulazione) per
-verificare le modifiche prima di applicarle realmente.
-
----
-
 ## 📁 Script
 
 | Script | Input | Descrizione |
