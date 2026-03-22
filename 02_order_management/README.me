@@ -10,14 +10,14 @@ e creare buoni sconto (gift card) in massa tramite API.
 | Script | Input | Output | Descrizione |
 |---|---|---|---|
 | `download_ordini.py` | Database PrestaShop | `header.csv` + `rows.csv` | Scarica ordini per intervallo di giorni scelto dall'utente |
-| `Buonisconto.py` | `giftcard.csv` | — | Crea buoni sconto su PrestaShop con validità 2 anni per ogni riga del CSV |
+| `creategiftcard.py` | `giftcard.csv` | — | Crea buoni sconto su PrestaShop con validità 2 anni per ogni riga del CSV |
 
 ---
 
 ## 📋 Flusso
 ```
 1. download_ordini.py   →  Scarica gli ordini → header.csv + rows.csv
-2. Buonisconto.py       →  Carica gift card da CSV → crea cart_rule su PrestaShop
+2. creategiftcard.py       →  Carica gift card da CSV → crea cart_rule su PrestaShop
 ```
 
 > I due script sono indipendenti — possono essere eseguiti separatamente.
@@ -36,7 +36,7 @@ db_config = {
 }
 ```
 
-**Buonisconto.py** — credenziali API PrestaShop:
+**creategiftcard.py** — credenziali API PrestaShop:
 ```python
 API_KEY  = "LA_TUA_API_KEY"
 SHOP_URL = "http://www.tuosito.com/api"
