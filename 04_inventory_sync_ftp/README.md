@@ -1,48 +1,70 @@
-# 📋 04_inventory_sync_ftp — Pulizia e Gestione Contatti CSV
+# 📡 04_inventory_sync_ftp — Sincronizzazione Giacenze via FTP
 
-Questa cartella contiene gli script per pulire, validare, deduplicare
-e filtrare file CSV di contatti aziendali, usati per le spedizioni
-di cataloghi e comunicazioni commerciali.
+Questa cartella contiene lo script per sincronizzare automaticamente
+le giacenze di magazzino tra il fornitore e il negozio PrestaShop.
 
----
-
-## 📋 Flusso consigliato
-
-```
-1. distinzione iva e non.py   →  Pulisce e separa aziende da privati
-2. removeDuplicate.py         →  Rimuove i duplicati dai file generati
-3. RemovefixIndirizzi.py      →  Valida e corregge gli indirizzi
-4. creazioneblacklist.py      →  Genera la blacklist per le spedizioni
-```
+Lo script combina tre tecnologie in un unico flusso automatico:
+**FTP** per scaricare il file dal fornitore, **CSV** per leggerlo
+e **API REST PrestaShop** per aggiornare le quantità.
 
 ---
 
 ## 📁 Script
 
-| Script | Input | Output | Descrizione |
-|---|---|---|---|
-| `distinzione iva e non.py` | `lista_nominativi.csv` + `INDIRIZZI DA SPEDIRE.csv` | `estrapolato_aziende.csv` + `estrapolato_privati.csv` | Pulisce e separa i contatti in base alla presenza della P.IVA |
-| `removeDuplicate.py` | `estrapolato_aziende.csv` + `estrapolato_privati.csv` | `*_univoco.csv` | Rimuove i duplicati confrontando ragione sociale + indirizzo + CAP |
-| `RemovefixIndirizzi.py` | `lista_nominativi.csv` | `estrapolato.csv` + `errori.csv` | Valida CAP, provincia e indirizzo — separa i record validi dagli errori |
-| `creazioneblacklist.py` | `estrapolato_aziende.csv` + file indirizzi da escludere | `blacklist.csv` | Genera la lista delle aziende da escludere dalle spedizioni |
+| Script | Input | Descrizione |
+|---|---|---|
+| `update_stock_ftp.py` | File FTP `giacenze.csv` | Scarica le giacenze via FTP e aggiorna le quantità su PrestaShop via API REST |
 
 ---
 
-## 🧹 Cosa viene pulito
+## 📋 Flusso
+```
+FTP Fornitore
+     ↓
+giacenze.csv (scaricato in locale)
+     ↓
+Lettura per codice / colore / taglia
+     ↓
+Costruzione referenza → <PREFISSO><codice>/<colore>/<taglia>
+     ↓
+Ricerca ID variante nel DB
+     ↓
+API REST PrestaShop → aggiornamento quantità
+```
 
-Gli script gestiscono automaticamente:
-- Numeri di telefono nel testo (TEL, FAX, CELL)
-- Caratteri speciali e virgolette
-- CAP non validi (tenta correzione automatica dall'indirizzo)
-- Province non valide (tenta correzione dalla città)
-- Duplicati (stessa ragione sociale + indirizzo + CAP)
-- P.IVA nascosta nel testo libero
+---
+
+## ⚙️ Configurazione
+```python
+# Credenziali FTP fornitore
+FTP_HOST     = "IL_TUO_HOST_FTP"
+FTP_USER     = "IL_TUO_UTENTE_FTP"
+FTP_PASSWORD = "LA_TUA_PASSWORD_FTP"
+
+# API PrestaShop
+SHOP_URL = "https://tuosito.com/api"
+API_KEY  = "LA_TUA_API_KEY"
+
+# Prefisso referenza articolo (es. se le tue referenze sono "ART001/NERO/M")
+PREFISSO_REFERENZA = "IL_TUO_PREFISSO"
+```
+
+---
+
+## 📄 Formato file CSV giacenze
+
+Il file `giacenze.csv` (separatore `;`) deve avere questa struttura:
+```
+codice ; ... ; colore ; XS ; S ; M ; L ; XL ; XXL ; 3XL ; 4XL
+ABC001 ; ... ; NERO   ;  2 ; 5 ; 3 ; 1 ;  0 ;   0 ;   0 ;   0
+ABC001 ; ... ; BIANCO ;  0 ; 2 ; 4 ; 3 ;  1 ;   0 ;   0 ;   0
+```
+
+> Le prime 2 righe sono intestazioni e vengono saltate automaticamente.
 
 ---
 
 ## 📦 Dipendenze
-
 ```bash
-# Nessuna dipendenza esterna — usa solo librerie standard Python
-# csv, re, os
+pip install ftputil requests mysql-connector-python
 ```
