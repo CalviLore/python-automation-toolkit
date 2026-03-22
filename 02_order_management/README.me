@@ -1,17 +1,7 @@
-# 📦 02_order_management — Gestione Ordini
+# 📦 02_order_management — Gestione Ordini e Buoni Sconto
 
-Questa cartella contiene gli script per scaricare, trasformare e formattare
-gli ordini PrestaShop per l'importazione nel gestionale aziendale.
-
----
-
-## 📋 Flusso consigliato
-
-```
-1. download_ordini.py   →  Scarica gli ordini dal DB → header.csv + rows.csv
-2. ordiniKit.py         →  Espande i prodotti KIT in righe singole → rows_new.csv
-3. cassa.py             →  Genera il file per il gestionale di cassa → demofile_cassa.txt
-```
+Questa cartella contiene gli script per scaricare gli ordini da PrestaShop
+e creare buoni sconto (gift card) in massa tramite API.
 
 ---
 
@@ -20,15 +10,23 @@ gli ordini PrestaShop per l'importazione nel gestionale aziendale.
 | Script | Input | Output | Descrizione |
 |---|---|---|---|
 | `download_ordini.py` | Database PrestaShop | `header.csv` + `rows.csv` | Scarica ordini per intervallo di giorni scelto dall'utente |
-| `ordiniKit.py` | `rows.csv` + `kitScuola.csv` | `rows_new.csv` | Espande i KIT nei componenti singoli con nome e prezzo |
-| `cassa.py` | Database PrestaShop | `demofile_cassa.txt` | Genera file a larghezza fissa per importazione nel gestionale |
+| `Buonisconto.py` | `giftcard.csv` | — | Crea buoni sconto su PrestaShop con validità 2 anni per ogni riga del CSV |
+
+---
+
+## 📋 Flusso
+```
+1. download_ordini.py   →  Scarica gli ordini → header.csv + rows.csv
+2. Buonisconto.py       →  Carica gift card da CSV → crea cart_rule su PrestaShop
+```
+
+> I due script sono indipendenti — possono essere eseguiti separatamente.
 
 ---
 
 ## ⚙️ Configurazione
 
-Ogni script richiede le credenziali del database PrestaShop:
-
+**download_ordini.py** — credenziali database:
 ```python
 db_config = {
     'host':     'IL_TUO_HOST',
@@ -38,10 +36,33 @@ db_config = {
 }
 ```
 
+**Buonisconto.py** — credenziali API PrestaShop:
+```python
+API_KEY  = "LA_TUA_API_KEY"
+SHOP_URL = "http://www.tuosito.com/api"
+```
+
+---
+
+## 📄 Formato file CSV
+
+**giftcard.csv** — separatore `;`:
+```
+codice;importo
+GIFT001;50
+GIFT002;100
+```
+
 ---
 
 ## 📦 Dipendenze
-
 ```bash
-pip install mysql-connector-python
+pip install mysql-connector-python prestapyt
 ```
+```
+
+---
+
+**Commit message:**
+```
+docs(order_management): update README with download_ordini and Buonisconto scripts
