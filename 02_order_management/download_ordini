@@ -1,0 +1,251 @@
+# Questo script scarica gli ordini dal database PrestaShop per un intervallo
+# di giorni scelto dall'utente e genera due file CSV pronti per l'importazione
+# nel gestionale:
+#
+#   - header.csv  → dati principali dell'ordine (cliente, indirizzi, pagamento)
+#   - rows.csv    → dettaglio articoli per ogni ordine (prodotti + sconti coupon)
+#
+# 📦 Dipendenze: mysql.connector, csv, datetime
+# ==============================================================================
+
+import mysql.connector
+import csv
+from datetime import datetime, timedelta
+
+# ------------------------------------------------------------------------------
+# CONFIGURAZIONE CONNESSIONE AL DATABASE
+# ⚠️ Non condividere mai queste credenziali pubblicamente!
+# ------------------------------------------------------------------------------
+db_config = {
+    'host':     'IL_TUO_HOST',        # Es. "localhost" o IP del server DB
+    'user':     'IL_TUO_UTENTE',      # Es. "root"
+    'password': 'LA_TUA_PASSWORD',    # Password del database
+    'database': 'IL_TUO_DATABASE'     # Es. "prestashop"
+}
+
+# ------------------------------------------------------------------------------
+# INPUT UTENTE — intervallo temporale
+# ------------------------------------------------------------------------------
+
+# Chiede all'utente quanti giorni indietro scaricare gli ordini
+try:
+    days_ago = int(input("Inserisci il numero di giorni per cui vuoi scaricare gli ordini: "))
+except ValueError:
+    print("Input non valido, verrà usato il valore di default di 1 giorno.")
+    days_ago = 1
+
+# Calcola la data di inizio in base ai giorni inseriti
+start_date = (datetime.now() - timedelta(days=days_ago)).strftime('%Y-%m-%d')
+
+# ------------------------------------------------------------------------------
+# FUNZIONI DI SUPPORTO
+# ------------------------------------------------------------------------------
+
+def findSconto(idOrder, orderList):
+    """
+    Cerca il valore dello sconto coupon per un dato ordine.
+    Lo sconto viene diviso per 1.22 per riportarlo al valore imponibile (IVA esclusa)
+    e restituito come stringa negativa con virgola decimale (formato gestionale).
+
+    Es: sconto lordo 12,20 → restituisce '-10,0'
+    """
+    for order in orderList:
+        if order['IdOrdine'] == idOrder:
+            sconto = float(order['ScontoCoupon'].replace(',', '.'))
+            sconto = round(sconto / 1.22, 2)
+            return '-' + str(sconto).replace('.', ',')
+
+
+def fetch_data(query, params=None):
+    """
+    Esegue una query sul database e restituisce i risultati come lista di dizionari.
+    Apre e chiude la connessione ad ogni chiamata.
+    """
+    connection = mysql.connector.connect(**db_config)
+    cursor = connection.cursor(dictionary=True)
+    cursor.execute(query, params)
+    results = cursor.fetchall()
+    cursor.close()
+    connection.close()
+    return results
+
+
+def write_csv(filename, data, headers):
+    """
+    Scrive una lista di dizionari in un file CSV con separatore ';'.
+
+    Args:
+        filename (str): nome del file di output
+        data (list):    lista di dizionari con i dati da scrivere
+        headers (list): lista dei campi (colonne) da includere nell'ordine corretto
+    """
+    with open(filename, mode='w', newline='', encoding='utf-8') as file:
+        writer = csv.writer(file, delimiter=';')
+        writer.writerow(headers)
+        for row in data:
+            writer.writerow([row[header] for header in headers])
+
+# ------------------------------------------------------------------------------
+# QUERY ORDINI — dati principali (header)
+# ------------------------------------------------------------------------------
+
+# Estrae tutti gli ordini del gruppo clienti retail (id_default_group = 3)
+# a partire dalla data calcolata, escludendo gli ordini di venditori terzi
+orders_query = f"""
+    SELECT 
+        o.id_order AS IdOrdine,
+        o.id_order AS CodiceOrdine,
+        '' AS Tags,
+        c.id_customer AS NumeroCliente,
+        p.transaction_id AS CodiceTransazione,
+        o.payment AS TpPagamento,
+        o.gift_message AS Note,
+        o.secure_key AS IP,
+        o.total_products AS PrTotProdotti,
+        o.total_discounts AS ScontoCoupon,
+        o.total_paid_tax_incl - o.total_paid_tax_excl AS PrIva,
+        o.total_shipping_tax_excl AS PrSpese,
+        p.payment_method AS CodicePagamento,
+        o.date_add AS DataOrdine,
+        a1.id_address AS CodIndirizzoCliente,
+        c.email AS Email,
+        c.firstname AS Nome,
+        c.lastname AS Cognome,
+        a1.company AS RagSociale,
+        a1.address1 AS Indirizzo,
+        a1.postcode AS CAP,
+        a1.city AS Comune,
+        psl1.name AS Provincia,
+        pcol1.iso_code AS Nazione,
+        a1.phone AS Telefono,
+        a1.vat_number AS PIVA,
+        a1.dni AS CF,
+        a1.sdi AS SDI,
+        a1.pec AS PEC,
+        a2.id_address AS CodIndirizzoSped,
+        '' AS NominativoSped,
+        CONCAT(a2.firstname, ' ', a2.lastname) AS NominativoSpedName,
+        a2.company AS NominativoSpedCompany,
+        a2.address1 AS IndirizzoSped,
+        a2.postcode AS CAPSped,
+        a2.city AS ComuneSped,
+        psl2.name AS ProvinciaSped,
+        pcol2.iso_code AS NazioneSped,
+        pcl.name AS MetodoSped
+    FROM ps_orders AS o
+    LEFT JOIN ps_customer AS c ON o.id_customer = c.id_customer
+    LEFT JOIN ps_address AS a1 ON o.id_address_invoice = a1.id_address
+    LEFT JOIN ps_address AS a2 ON o.id_address_delivery = a2.id_address
+    LEFT JOIN ps_order_payment AS p ON o.reference = p.order_reference
+    LEFT JOIN ps_carrier AS pcl ON o.id_carrier = pcl.id_carrier
+    LEFT JOIN ps_state AS psl1 ON a1.id_state = psl1.id_state
+    LEFT JOIN ps_country AS pcol1 ON a1.id_country = pcol1.id_country
+    LEFT JOIN ps_state AS psl2 ON a2.id_state = psl2.id_state
+    LEFT JOIN ps_country AS pcol2 ON a2.id_country = pcol2.id_country
+    WHERE o.date_add >= %s
+      AND c.id_default_group = 3
+      AND o.id_order NOT IN (
+          SELECT id_order FROM ps_ets_mp_seller_order
+      )
+    ORDER BY o.id_order
+"""
+
+orders = fetch_data(orders_query, (start_date,))
+sconti_details = []  # Conterrà le righe sconto da aggiungere al dettaglio ordini
+
+# ------------------------------------------------------------------------------
+# ELABORAZIONE ORDINI
+# ------------------------------------------------------------------------------
+
+for item in orders:
+    # Converte i valori numerici in stringhe con virgola (formato gestionale italiano)
+    item['PrTotProdotti'] = str(round(item['PrTotProdotti'], 2)).replace('.', ',')
+    item['ScontoCoupon']  = str(round(item['ScontoCoupon'],  2)).replace('.', ',')
+    item['PrIva']         = str(round(item['PrIva'],         2)).replace('.', ',')
+    item['PrSpese']       = str(round(item['PrSpese'],       2)).replace('.', ',')
+
+    # Pulizia codice SDI (rimuove spazi extra)
+    if item['SDI']:
+        item['SDI'] = str(item['SDI']).strip()
+
+    # Usa la ragione sociale come nominativo spedizione se disponibile,
+    # altrimenti usa nome e cognome del destinatario
+    if item['NominativoSpedCompany']:
+        item['NominativoSped'] = item['NominativoSpedCompany']
+    else:
+        item['NominativoSped'] = item['NominativoSpedName']
+
+    # Rimuove le colonne temporanee non necessarie nell'output
+    del item['NominativoSpedCompany']
+    del item['NominativoSpedName']
+
+    # Se l'ordine ha uno sconto coupon, aggiunge una riga sconto nel dettaglio
+    sconto = findSconto(item['IdOrdine'], orders)
+    if sconto != '-0,0':
+        sconti_details.append({
+            'IdOrdine':       item['IdOrdine'],
+            'IdDettaglio':    9999999,           # ID fittizio per le righe sconto
+            'CodiceVariante': 'SCONTOC',
+            'DesProdotto':    'SCONTO ORDINE',
+            'Qta':            1,
+            'PrUni':          sconto,
+            'PrezzoListino':  sconto
+        })
+
+# ------------------------------------------------------------------------------
+# SCRITTURA FILE header.csv
+# ------------------------------------------------------------------------------
+
+header_fields = [
+    "IdOrdine", "CodiceOrdine", "Tags", "NumeroCliente", "CodiceTransazione",
+    "TpPagamento", "Note", "IP", "PrTotProdotti", "ScontoCoupon", "PrIva",
+    "PrSpese", "CodicePagamento", "DataOrdine", "CodIndirizzoCliente",
+    "Email", "Nome", "Cognome", "RagSociale", "Indirizzo", "CAP", "Comune",
+    "Provincia", "Nazione", "Telefono", "PIVA", "CF", "SDI", "PEC",
+    "CodIndirizzoSped", "NominativoSped", "IndirizzoSped", "CAPSped",
+    "ComuneSped", "ProvinciaSped", "NazioneSped", "MetodoSped"
+]
+
+write_csv('header.csv', orders, header_fields)
+
+# ------------------------------------------------------------------------------
+# QUERY DETTAGLI ORDINE — articoli per ogni ordine
+# ------------------------------------------------------------------------------
+
+# Recupera il dettaglio prodotti solo per gli ordini già scaricati
+details_query = f"""
+    SELECT 
+        od.id_order AS IdOrdine,
+        od.id_order_detail AS IdDettaglio,
+        od.product_reference AS CodiceVariante,
+        od.product_name AS DesProdotto,
+        od.product_quantity AS Qta,
+        od.unit_price_tax_excl AS PrUni,
+        od.total_price_tax_excl AS PrezzoListino
+    FROM ps_order_detail AS od
+    WHERE od.id_order IN ({",".join([str(order['IdOrdine']) for order in orders])})
+"""
+
+order_details = fetch_data(details_query)
+
+for item in order_details:
+    # Converte prezzi in formato stringa con virgola
+    item['PrUni']         = str(round(item['PrUni'],         2)).replace('.', ',')
+    item['PrezzoListino'] = str(round(item['PrezzoListino'], 2)).replace('.', ',')
+
+    # Normalizza i codici variante: "CC/..." → "C/..."
+    if item['CodiceVariante'].startswith('CC/'):
+        item['CodiceVariante'] = item['CodiceVariante'].replace('CC/', 'C/')
+
+# Aggiunge le righe sconto coupon in fondo al dettaglio
+order_details.extend(sconti_details)
+
+# ------------------------------------------------------------------------------
+# SCRITTURA FILE rows.csv
+# ------------------------------------------------------------------------------
+
+details_fields = ["IdOrdine", "IdDettaglio", "CodiceVariante", "DesProdotto", "Qta", "PrUni", "PrezzoListino"]
+
+write_csv('rows.csv', order_details, details_fields)
+
+print("✅ File header.csv e rows.csv generati con successo!")
